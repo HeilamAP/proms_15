@@ -2,132 +2,134 @@ using Microsoft.Extensions.DependencyInjection;
 using UTMMarket.Application.Interfaces;
 using UTMMarket.Application.UseCases;
 using UTMMarket.Core.DTOs;
-using UTMMarket.Core.Entities;
+using UTMMarket.Core.Entidades;
 using UTMMarket.Core.Interfaces;
 using UTMMarket.Infrastructure.Repositories;
 
-var services = new ServiceCollection();
+var servicios = new ServiceCollection();
 
-// Registration
-services.AddSingleton<ICustomerRepository, MockCustomerRepository>();
-services.AddScoped<IProductRepository, ProductRepository>();
-services.AddScoped<ISaleRepository, SaleRepository>();
+// Registro de Repositorios (Mock para ejecución local)
+servicios.AddSingleton<IClienteRepository, MockClienteRepository>();
+servicios.AddSingleton<IProductoRepository, MockProductoRepository>();
+servicios.AddSingleton<IVentaRepository, MockVentaRepository>();
 
-services.AddScoped<ILowStockAlertUseCase, LowStockAlertUseCaseImpl>();
-services.AddScoped<IFetchSalesByFilterUseCase, FetchSalesByFilterUseCaseImpl>();
+// Registro de Casos de Uso
+servicios.AddScoped<IAlertaStockBajoUseCase, AlertaStockBajoUseCaseImpl>();
+servicios.AddScoped<IConsultarVentasPorFiltroUseCase, ConsultarVentasPorFiltroUseCaseImpl>();
 
-var serviceProvider = services.BuildServiceProvider();
+var proveedorServicios = servicios.BuildServiceProvider();
 
-bool exit = false;
-while (!exit)
+bool salir = false;
+while (!salir)
 {
     Console.Clear();
-    Console.WriteLine("=== UTM Market - Sistema de Gestión ===");
-    Console.WriteLine("1. Registrar Cliente (Ex 1)");
-    Console.WriteLine("2. Alerta de Stock Crítico (Ex 2)");
-    Console.WriteLine("3. Consultar ventas por fecha (Ex 3)");
-    Console.WriteLine("4. Salir");
+    Console.WriteLine("========================================");
+    Console.WriteLine("       UTM Market - Menú Principal");
+    Console.WriteLine("========================================");
+    Console.WriteLine("1. Gestión de Clientes (Tabla: Clientes)");
+    Console.WriteLine("2. Gestión de Inventario (Tabla: Productos)");
+    Console.WriteLine("3. Gestión de Ventas (Tablas: Ventas/Detalles)");
+    Console.WriteLine("4. Reportes de Alerta (Stock Bajo)");
+    Console.WriteLine("5. Consultar Ventas por Fecha");
+    Console.WriteLine("6. Salir");
+    Console.WriteLine("========================================");
     Console.Write("Seleccione una opción: ");
 
-    var option = Console.ReadLine();
+    var opcion = Console.ReadLine();
 
-    switch (option)
+    switch (opcion)
     {
-        case "1":
-            await HandleCustomerRegistration();
-            break;
-        case "2":
-            await HandleLowStockAlert();
-            break;
-        case "3":
-            await HandleSalesByDate();
-            break;
-        case "4":
-            exit = true;
-            break;
+        case "1": await MenuClientes(); break;
+        case "2": await MenuProductos(); break;
+        case "3": await MenuVentas(); break;
+        case "4": await ManejarAlertaStock(); break;
+        case "5": await ManejarVentasPorFecha(); break;
+        case "6": salir = true; break;
     }
 
-    if (!exit)
+    if (!salir)
     {
         Console.WriteLine("\nPresione cualquier tecla para continuar...");
         Console.ReadKey();
     }
 }
 
-async Task HandleCustomerRegistration()
+async Task MenuClientes()
 {
-    using var scope = serviceProvider.CreateScope();
-    var repo = scope.ServiceProvider.GetRequiredService<ICustomerRepository>();
+    using var scope = proveedorServicios.CreateScope();
+    var repo = scope.ServiceProvider.GetRequiredService<IClienteRepository>();
+    
+    Console.WriteLine("\n--- OPCIONES DE TABLA: CLIENTES ---");
+    Console.WriteLine("1. Registrar Nuevo Cliente");
+    Console.WriteLine("2. Listar Clientes");
+    var subOpcion = Console.ReadLine();
 
-    Console.WriteLine("\n--- Registro de Cliente ---");
-    Console.Write("Nombre completo: ");
-    var name = Console.ReadLine() ?? "";
-    Console.Write("Email: ");
-    var email = Console.ReadLine() ?? "";
-
-    try
+    if (subOpcion == "1")
     {
-        var customer = new Customer { FullName = name, Email = email };
-        // This will fail without a real DB, so we catch it for the demo
-        await repo.AddAsync(customer);
-        Console.WriteLine($"Cliente registrado con ID: {customer.CustomerId}");
+        Console.Write("Nombre completo: ");
+        var nombre = Console.ReadLine() ?? "";
+        Console.Write("Email: ");
+        var email = Console.ReadLine() ?? "";
+        
+        try {
+            var cliente = new Cliente { NombreCompleto = nombre, Email = email };
+            await repo.AgregarAsync(cliente);
+            Console.WriteLine($"Cliente registrado con ID: {cliente.ClienteId}");
+        } catch (Exception ex) { Console.WriteLine($"Error: {ex.Message}"); }
     }
-    catch (Exception ex)
+    else if (subOpcion == "2")
     {
-        Console.WriteLine($"Error: {ex.Message}");
+        var clientes = await repo.ObtenerTodosAsync();
+        foreach(var c in clientes) Console.WriteLine($"[{c.ClienteId}] {c.NombreCompleto} - {c.Email}");
     }
 }
 
-async Task HandleLowStockAlert()
+async Task MenuProductos()
 {
-    using var scope = serviceProvider.CreateScope();
-    var useCase = scope.ServiceProvider.GetRequiredService<ILowStockAlertUseCase>();
+    using var scope = proveedorServicios.CreateScope();
+    var repo = scope.ServiceProvider.GetRequiredService<IProductoRepository>();
+    
+    Console.WriteLine("\n--- OPCIONES DE TABLA: PRODUCTOS ---");
+    Console.WriteLine("1. Listar Productos");
+    var subOpcion = Console.ReadLine();
 
-    Console.Write("\nIngrese el umbral de stock: ");
-    if (int.TryParse(Console.ReadLine(), out int threshold))
+    if (subOpcion == "1")
     {
-        Console.WriteLine("\nProductos con bajo stock:");
-        Console.WriteLine("-------------------------");
-        await foreach (var product in useCase.ExecuteAsync(threshold))
-        {
-            Console.WriteLine($"ID: {product.ProductId} | {product.Name} | Stock: {product.Stock}");
-        }
-    }
-    else
-    {
-        Console.WriteLine("Umbral inválido.");
+        await foreach(var p in repo.ObtenerTodosAsync())
+            Console.WriteLine($"[{p.ProductoId}] {p.Nombre} - Stock: {p.Stock} - Precio: {p.Precio:C}");
     }
 }
 
-async Task HandleSalesByDate()
+async Task MenuVentas()
 {
-    using var scope = serviceProvider.CreateScope();
-    var useCase = scope.ServiceProvider.GetRequiredService<IFetchSalesByFilterUseCase>();
+    Console.WriteLine("\n--- OPCIONES DE TABLAS: VENTAS / DETALLES ---");
+    Console.WriteLine("1. Consultar Historial Completo");
+    // Lógica para ventas...
+}
 
-    Console.Write("\nFecha de Inicio (yyyy-mm-dd): ");
-    if (!DateTime.TryParse(Console.ReadLine(), out DateTime startDate))
+async Task ManejarAlertaStock()
+{
+    using var scope = proveedorServicios.CreateScope();
+    var useCase = scope.ServiceProvider.GetRequiredService<IAlertaStockBajoUseCase>();
+
+    Console.Write("\nUmbral de stock: ");
+    if (int.TryParse(Console.ReadLine(), out int umbral))
     {
-        Console.WriteLine("Fecha inválida.");
-        return;
+        await foreach (var p in useCase.EjecutarAsync(umbral))
+            Console.WriteLine($"ALERTA: {p.Nombre} tiene solo {p.Stock} unidades.");
     }
+}
 
-    Console.Write("Fecha de Fin (yyyy-mm-dd): ");
-    if (!DateTime.TryParse(Console.ReadLine(), out DateTime endDate))
-    {
-        Console.WriteLine("Fecha inválida.");
-        return;
-    }
+async Task ManejarVentasPorFecha()
+{
+    using var scope = proveedorServicios.CreateScope();
+    var useCase = scope.ServiceProvider.GetRequiredService<IConsultarVentasPorFiltroUseCase>();
 
-    var filter = new SaleFilter(startDate, endDate);
-    var sales = await useCase.ExecuteAsync(filter);
+    Console.Write("\nFecha Inicio (aaaa-mm-dd): ");
+    DateTime.TryParse(Console.ReadLine(), out DateTime inicio);
+    Console.Write("Fecha Fin (aaaa-mm-dd): ");
+    DateTime.TryParse(Console.ReadLine(), out DateTime fin);
 
-    Console.WriteLine("\nHistorial de Ventas:");
-    Console.WriteLine("--------------------------------------------------");
-    Console.WriteLine("{0,-10} | {1,-15} | {2,-10}", "Folio", "Fecha", "Monto Total");
-    Console.WriteLine("--------------------------------------------------");
-
-    foreach (var sale in sales)
-    {
-        Console.WriteLine("{0,-10} | {1,-15:yyyy-MM-dd} | {2,10:C}", sale.Folio, sale.Date, sale.TotalAmount);
-    }
+    var ventas = await useCase.EjecutarAsync(inicio, fin);
+    foreach(var v in ventas) Console.WriteLine($"{v.Folio} | {v.Fecha:yyyy-MM-dd} | {v.Total:C}");
 }
