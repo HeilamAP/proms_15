@@ -9,9 +9,7 @@ using UTMMarket.Infrastructure.Repositories;
 var services = new ServiceCollection();
 
 // Registration
-services.AddSingleton<string>("Server=(localdb)\\mssqllocaldb;Database=UTMMarket;Trusted_Connection=True;");
-services.AddScoped<ICustomerRepository, CustomerRepository>(sp => 
-    new CustomerRepository(sp.GetRequiredService<string>()));
+services.AddSingleton<ICustomerRepository, MockCustomerRepository>();
 services.AddScoped<IProductRepository, ProductRepository>();
 services.AddScoped<ISaleRepository, SaleRepository>();
 
