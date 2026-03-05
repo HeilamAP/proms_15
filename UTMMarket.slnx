@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="UTMMarket.Application/UTMMarket.Application.csproj" />
+  <Project Path="UTMMarket.Core/UTMMarket.Core.csproj" />
+  <Project Path="UTMMarket.Infrastructure/UTMMarket.Infrastructure.csproj" />
+  <Project Path="UTMMarket.UI/UTMMarket.UI.csproj" />
+</Solution>
